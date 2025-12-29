@@ -149,3 +149,79 @@ al.title,al.AlbumId having count(TrackId)>
 from (select count(TrackId) as total_count 
 from track group by albumid) sub) order by count desc;
 
+select BillingCountry,sum(total)as total_sell from invoice group by BillingCountry;
+select BillingCountry,avg(total)as total_sell from invoice group by BillingCountry;
+--Q20.Find countries where total sales are above average country sales.
+select i.BillingCountry,sum(i.total) 
+as total from Invoice i group by i.BillingCountry 
+having sum(total)>(select avg(total_sell) from (select sum(total)as total_sell from invoice group by BillingCountry) sub)
+order by total desc;
+
+select i.BillingCountry,sum(il.Quantity*il.UnitPrice) as total from invoice i join 
+InvoiceLine il on i.InvoiceId=il.InvoiceId
+group by i.BillingCountry
+having sum(il.Quantity*il.UnitPrice)>(select avg(total_sell) from (select sum(il.quantity*il.UnitPrice)as total_sell from InvoiceLine il join invoice i on il.InvoiceId=i.InvoiceId 
+group by i.BillingCountry) sub) order by total desc;
+
+-- Q21: Find tracks that have never been sold
+
+SELECT
+    t.TrackId,
+    t.Name
+FROM Track t
+WHERE NOT EXISTS
+(
+    SELECT 1
+    FROM InvoiceLine il
+    WHERE il.TrackId = t.TrackId
+);
+
+--Q22.Find customers who have purchased all their tracks from only one genre.
+select c.CustomerId,c.FirstName,c.lastname,count(distinct g.genreid) as total,g.Name from customer c
+ join invoice i on c.CustomerId=i.CustomerId
+  join InvoiceLine il on i.InvoiceId=il.InvoiceId
+ join track t on il.TrackId=t.TrackId 
+ join genre g
+on t.genreid=g.GenreId group by c.CustomerId,
+c.FirstName,c.LastName having count(distinct g.genreid)=1;
+
+--Q23.Find the invoice that has the highest total value.
+select * from invoice
+ where total=(select max(total) from invoice);
+
+ --Q24.Find the employee who supported the maximum number of customers.
+ SELECT
+    e.EmployeeId,
+    e.FirstName,
+    e.LastName,
+    COUNT(c.CustomerId) AS customer_count
+FROM Employee e
+JOIN Customer c
+    ON e.EmployeeId = c.SupportRepId
+GROUP BY
+    e.EmployeeId,
+    e.FirstName,
+    e.LastName
+ORDER BY
+    customer_count DESC
+LIMIT 1;
+
+--25.Find customers who have not purchased anything in the last invoice date.
+-- Q25: Find customers who have not purchased anything on the latest invoice date
+
+SELECT
+    c.CustomerId,
+    c.FirstName,
+    c.LastName
+FROM Customer c
+WHERE NOT EXISTS
+(
+    SELECT 1
+    FROM Invoice i
+    WHERE i.CustomerId = c.CustomerId
+      AND i.InvoiceDate =
+      (
+          SELECT MAX(InvoiceDate)
+          FROM Invoice
+      )
+);
