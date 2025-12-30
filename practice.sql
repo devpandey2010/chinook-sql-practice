@@ -225,3 +225,222 @@ WHERE NOT EXISTS
           FROM Invoice
       )
 );
+
+--Q26.Find customers who spent more than the overall average invoice amount.
+select 
+    c.CustomerId,c.FirstName,c.LastName,sum(i.total) as total_amt 
+    from customer c
+join 
+    invoice i on c.CustomerId=i.CustomerId 
+group by 
+      c.CustomerId,c.FirstName,c.LastName
+having sum(i.total)>
+(select 
+avg(total) as total_avg
+ from 
+ invoice)
+order by 
+total_amt desc;
+
+--Q27.Find invoices whose total is greater than the average invoice total.
+select 
+    i.InvoiceId,
+    sum(i.total) as total_amt 
+from 
+    invoice i
+group by 
+    i.InvoiceId
+having 
+sum(i.total)>
+(select 
+    avg(total_invoice)
+from 
+(select 
+    sum(total)as total_invoice 
+from 
+    invoice group by InvoiceId))
+order by 
+    total_amt desc;
+
+
+-- Q27: Find invoices whose total is greater than the average invoice total
+
+SELECT
+    InvoiceId,
+    Total
+FROM Invoice
+WHERE Total >
+(
+    SELECT AVG(Total)
+    FROM Invoice
+)
+ORDER BY Total DESC;
+
+--Q28.Find albums that contain at least one track longer than the average track length.
+select 
+   al.AlbumId,
+   al.title
+from 
+   album al
+WHERE EXISTS
+(
+    select 1
+    from track t
+    where al.AlbumId=t.AlbumId 
+    and t.Bytes>(select avg(Bytes) from track)
+);
+--alternate solution
+SELECT 
+    al.AlbumId,
+    al.Title
+FROM Album al
+JOIN Track t ON t.AlbumId = al.AlbumId
+GROUP BY al.AlbumId, al.Title
+HAVING MAX(t.Bytes) > (SELECT AVG(Bytes) FROM Track);
+
+--Q29.Find customers who have never purchased Rock genre tracks.
+SELECT 
+    c.CustomerId,
+    c.FirstName,
+    c.LastName
+FROM Customer c
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM Invoice i
+    JOIN InvoiceLine il ON i.InvoiceId = il.InvoiceId
+    JOIN Track t ON il.TrackId = t.TrackId
+    JOIN Genre g ON t.GenreId = g.GenreId
+    WHERE i.CustomerId = c.CustomerId
+      AND g.Name = 'Rock'
+);
+--Q.30.Find artists who have never sold a track.
+SELECT
+    ar.ArtistId,
+    ar.name
+FROM
+    artist ar
+where not EXISTS(
+    select 1
+    from 
+    album Al
+    join track T on al.AlbumId=t.AlbumId
+    join invoiceline il
+    on t.trackid=il.trackid
+    where al.ArtistId=ar.ArtistId
+);
+
+--Q31.Find genres that generated less revenue than the average genre revenue.
+select 
+    g.genreid,
+    g.Name,
+    sum(il.quantity*il.UnitPrice) as total_amt
+from 
+    genre g
+JOIN track ton g.genreid=t.GenreId
+JOIN invoiceline ilon t.trackid=il.TrackId
+group by 
+    g.genreid,
+    g.name
+having sum(il.quantity*il.UnitPrice)<
+(select 
+    avg(total_price)
+FROM
+(select 
+    sum(il.quantity*il.UnitPrice) as total_price 
+from 
+    invoiceline il 
+join track t on il.trackid=t.TrackId
+join genre g on t.genreid=g.genreid 
+group by 
+g.genreid) sub)
+order by total_amt desc;
+
+-- Q32. Find customers who purchased the most expensive track
+SELECT DISTINCT
+    c.CustomerId,
+    c.FirstName,
+    c.LastName
+FROM Customer c
+JOIN Invoice i 
+    ON c.CustomerId = i.CustomerId
+JOIN InvoiceLine il 
+    ON i.InvoiceId = il.InvoiceId
+JOIN Track t 
+    ON il.TrackId = t.TrackId
+WHERE t.UnitPrice = (
+    SELECT MAX(UnitPrice) 
+    FROM Track
+);
+
+--Q33.Find customers who share the same support representative and have similar spending patterns (above average)
+/* i have to find the customer having same support and similat spending patter so i need to group by the customers on the two basis
+first on the basis of support and then who are above average so i can make cases to mark above average and the group it*/
+-- Q33. Find customers who share the same support representative
+-- and have above-average spending patterns
+
+SELECT
+    c.SupportRepId,
+    c.CustomerId,
+    c.FirstName,
+    c.LastName,
+    SUM(il.Quantity * il.UnitPrice) AS total_spent
+FROM Customer c
+JOIN Invoice i 
+    ON c.CustomerId = i.CustomerId
+JOIN InvoiceLine il 
+    ON i.InvoiceId = il.InvoiceId
+GROUP BY
+    c.SupportRepId,
+    c.CustomerId,
+    c.FirstName,
+    c.LastName
+HAVING
+    SUM(il.Quantity * il.UnitPrice) >
+    (
+        SELECT AVG(customer_total)
+        FROM (
+            SELECT
+                SUM(il.Quantity * il.UnitPrice) AS customer_total
+            FROM Customer c
+            JOIN Invoice i ON c.CustomerId = i.CustomerId
+            JOIN InvoiceLine il ON i.InvoiceId = il.InvoiceId
+            GROUP BY c.CustomerId
+        ) sub
+    )
+ORDER BY
+    c.SupportRepId,
+    total_spent DESC;
+
+SELECT
+    c.CustomerId,
+    SUM(il.Quantity * il.UnitPrice) AS total_spent,
+    CASE
+        WHEN SUM(il.Quantity * il.UnitPrice) >
+             (
+               SELECT AVG(total_amt)
+               FROM (
+                   SELECT SUM(il.Quantity * il.UnitPrice) AS total_amt
+                   FROM InvoiceLine
+                   GROUP BY InvoiceId
+               ) sub
+        THEN 'Above Average'
+        ELSE 'Below Average'
+    END AS spending_category
+FROM Customer c
+JOIN Invoice i ON c.CustomerId = i.CustomerId
+JOIN InvoiceLine il ON i.InvoiceId = il.InvoiceId
+GROUP BY c.CustomerId;
+
+
+SELECT
+    COUNT(
+        CASE
+            WHEN Genre = 'Rock' THEN 1
+        END
+    ) AS rock_count,
+    COUNT(
+        CASE
+            WHEN Genre = 'Jazz' THEN 1
+        END
+    ) AS jazz_count
+FROM Track;
